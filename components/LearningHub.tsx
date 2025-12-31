@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Upload, FileText, Coins, Bot, X, Send, Eye, Library, BrainCircuit, BarChart3, GraduationCap, CheckCircle, Globe, Briefcase, ChevronRight, BookOpen, Trophy, User as UserIcon, Medal, TrendingUp, Languages, BookOpenCheck } from 'lucide-react';
+import { Search, Upload, FileText, Coins, Bot, X, Send, Eye, Library, BrainCircuit, BarChart3, GraduationCap, CheckCircle, Globe, Briefcase, ChevronRight, BookOpen, Trophy, User as UserIcon, Medal, TrendingUp, Languages, BookOpenCheck, AlertTriangle } from 'lucide-react';
 import { DocumentItem, ChatMessage } from '../types';
 import { generateStudyHelp } from '../services/geminiService';
 
@@ -10,8 +10,9 @@ interface LearningHubProps {
   userPurpose?: 'academic' | 'self-study' | 'ielts-gre' | 'job-prep';
   onPreviewDoc: (doc: DocumentItem) => void;
   onOpenDoc: (doc: DocumentItem) => void; // New handler for reading
-  onUploadDoc: (doc: DocumentItem, rewardType: 'instant' | 'sell', instantAmount: number) => void;
+  onUploadDoc: (doc: DocumentItem, rewardType: 'instant' | 'sell', instantAmount: number) => boolean;
   initialTab?: 'market' | 'library' | 'chat' | 'prep';
+  dailyUploadCount: number;
 }
 
 // Leaderboard Data (Static for demo)
@@ -100,7 +101,7 @@ const QuestionBankItem = ({ name, icon, count }: { name: string, icon: React.Rea
   </div>
 );
 
-const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose, onPreviewDoc, onOpenDoc, onUploadDoc, initialTab = 'market' }) => {
+const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose, onPreviewDoc, onOpenDoc, onUploadDoc, dailyUploadCount, initialTab = 'market' }) => {
   // --- State ---
   const [activeTab, setActiveTab] = useState<'market' | 'library' | 'chat' | 'prep'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
@@ -111,6 +112,7 @@ const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose
   const [uploadTags, setUploadTags] = useState('');
   const [uploadType, setUploadType] = useState<'instant' | 'sell'>('instant');
   const [sellPrice, setSellPrice] = useState(50000);
+  const [showLimitAlert, setShowLimitAlert] = useState(false);
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -144,6 +146,15 @@ const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check Limit locally first for UI feedback
+    if (dailyUploadCount >= 5) {
+      setShowLimitAlert(true);
+      // Hide after 3 seconds
+      setTimeout(() => setShowLimitAlert(false), 3000);
+      return; 
+    }
+
     const newDoc: DocumentItem = {
       id: Date.now().toString(),
       title: uploadTitle,
@@ -158,13 +169,15 @@ const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose
     
     // Trigger parent update (add to list + add points)
     // REWARD INCREASED TO 80,000 COINS
-    onUploadDoc(newDoc, uploadType, 80000);
+    const success = onUploadDoc(newDoc, uploadType, 80000);
     
-    // Reset & Close
-    setUploadTitle('');
-    setUploadTags('');
-    setUploadType('instant');
-    setShowUploadModal(false);
+    if (success) {
+      // Reset & Close only if successful
+      setUploadTitle('');
+      setUploadTags('');
+      setUploadType('instant');
+      setShowUploadModal(false);
+    }
   };
 
   const sendMessage = async () => {
@@ -460,10 +473,25 @@ const LearningHub: React.FC<LearningHubProps> = ({ docs, userPoints, userPurpose
 
         {/* Upload Modal Overlay */}
         {showUploadModal && (
-          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+            
+            {/* The Alert - Rendered conditionally */}
+            {showLimitAlert && (
+                <div className="mb-4 bg-red-600 text-white px-6 py-4 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.5)] font-bold flex items-center gap-3 animate-fade-in-up z-60 transform transition-all">
+                    <div className="bg-white/20 p-2 rounded-full"><AlertTriangle className="w-5 h-5"/></div>
+                    <div>
+                        <h4 className="leading-tight">Daily Limit Reached</h4>
+                        <p className="text-xs text-red-100 font-medium">You can upload again tomorrow.</p>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-[#121214] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
               <div className="bg-gradient-to-r from-purple-700 to-indigo-700 p-4 flex justify-between items-center text-white">
-                <h3 className="font-bold flex items-center gap-2"><Upload className="w-5 h-5" /> Upload Material</h3>
+                <div>
+                   <h3 className="font-bold flex items-center gap-2"><Upload className="w-5 h-5" /> Upload Material</h3>
+                   <span className="text-[10px] text-white/80 font-medium">Daily Limit: {dailyUploadCount}/5</span>
+                </div>
                 <button onClick={() => setShowUploadModal(false)} className="hover:bg-white/10 p-1 rounded"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleUploadSubmit} className="p-6">

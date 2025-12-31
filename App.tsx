@@ -246,8 +246,11 @@ const App: React.FC = () => {
   // Document State (Lifted from LearningHub)
   const [docs, setDocs] = useState<DocumentItem[]>(INITIAL_DOCS);
   
+  // New State for Daily Uploads
+  const [dailyUploads, setDailyUploads] = useState(0);
+  
   const [user, setUser] = useState<User>({
-    name: 'Bongoboltu',
+    name: 'Mahi',
     phoneNumber: '01412345678',
     balanceCoins: 598240,
     balanceBDT: 1500,
@@ -575,16 +578,25 @@ const App: React.FC = () => {
     openConfirmation(() => processBuyPackage(pkg));
   };
 
-  const handleUploadDoc = (doc: DocumentItem, rewardType: 'instant' | 'sell', amount: number) => {
+  const handleUploadDoc = (doc: DocumentItem, rewardType: 'instant' | 'sell', amount: number): boolean => {
+    // Check Daily Limit (5 files/day)
+    if (dailyUploads >= 5) {
+      showNotification("Daily upload limit reached (5/5). Please try again tomorrow.", "error");
+      return false;
+    }
+
     // Add new doc to global list
     setDocs(prev => [doc, ...prev]);
+    // Increment daily count
+    setDailyUploads(prev => prev + 1);
 
     if (rewardType === 'instant') {
       setUser(prev => ({ ...prev, balanceCoins: prev.balanceCoins + amount }));
-      showNotification(`Upload successful! You earned ${amount.toLocaleString()} Ryze Coins instantly.`);
+      showNotification(`Upload successful! (${dailyUploads + 1}/5) You earned ${amount.toLocaleString()} Ryze Coins instantly.`);
     } else {
-      showNotification(`Upload successful! Listed for ${doc.priceCoins.toLocaleString()} Ryze Coins.`);
+      showNotification(`Upload successful! (${dailyUploads + 1}/5) Listed for ${doc.priceCoins.toLocaleString()} Ryze Coins.`);
     }
+    return true;
   };
 
   const handlePreviewDoc = (doc: DocumentItem) => {
@@ -779,6 +791,7 @@ const App: React.FC = () => {
                         onOpenDoc={handleOpenDoc}
                         onUploadDoc={handleUploadDoc}
                         initialTab={learningTab}
+                        dailyUploadCount={dailyUploads}
                     />
                   </div>
                 )}
